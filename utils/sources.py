@@ -22,10 +22,7 @@ def get_pitch_params(driver: Chrome):
         time.sleep(1)
 
     # Deleting the popup shown at the end of the presentation
-    try:
-        driver.execute_script("document.getElementsByClassName('player-branding-popover')[0].remove();")
-    except Exception:
-        print('Could not remove branding popover...')
+    driver.execute_script("document.getElementsByClassName('player-branding-popover')[0].remove();")
 
     n_slides = len(driver.find_elements(By.CLASS_NAME, 'dash'))
 

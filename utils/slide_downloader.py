@@ -4,7 +4,6 @@ from selenium.webdriver.chrome.options import Options
 from PIL import Image, ImageChops
 from io import BytesIO
 
-from tqdm import tqdm
 import time
 
 from utils import sources
@@ -12,7 +11,7 @@ from enum import Enum
 
 
 # Helper: Loading from memory and converting RGBA to RGB
-def _rgba_to_rgb(png):
+def _rgba_to_rgb(png: bytes):
     img = Image.open(BytesIO(png))
     img.load()
     background = Image.new('RGB', img.size, (255, 255, 255))
@@ -24,7 +23,7 @@ def _rgba_to_rgb(png):
     return background
 
 
-def _crop_black_borders(png):
+def _crop_black_borders(png: bytes):
     """
     Crops black borders from a PNG image.
     """
@@ -155,9 +154,7 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> s
     )
 
     # Saving the screenshots as a PDF using Pillow
-    print('\nConverting RGBA to RGB...')
-    images = [_rgba_to_rgb(png) for png in tqdm(png_slides)]
-    print('Conversion finished!')
+    images = [_rgba_to_rgb(png) for png in png_slides]
 
     title = ''.join([char for char in driver.title if char.isalpha()])
 
