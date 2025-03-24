@@ -81,8 +81,14 @@ def get_chrome_driver(resolution: ResolutionEnum, disable_headless: bool = False
     return driver
 
 
-def scrape_slides(driver: webdriver.Chrome, n_slides, next_btn, slide_selector, pitch_dot_com=False,
-                  skip_border_removal=False):
+def scrape_slides(
+        driver: webdriver.Chrome,
+        n_slides: int,
+        next_btn,
+        slide_selector,
+        pitch_dot_com=False,
+        skip_border_removal=False
+) -> list[bytes]:
     """
     Takes a screenshot of all slides and returns a list of pngs
 
@@ -92,7 +98,7 @@ def scrape_slides(driver: webdriver.Chrome, n_slides, next_btn, slide_selector, 
     """
 
     png_slides = []
-    for n in tqdm(range(n_slides)):
+    for n in range(n_slides):
 
         # Animations in pitch.com ...
         if pitch_dot_com:
@@ -132,8 +138,6 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> s
     if 'pitch.com' in url:
         params = sources.get_pitch_params(driver)
         pitch = True
-    elif 'canva.com' in url:
-        params = sources.get_canva_params(driver)
     elif 'docs.google.com/presentation/' in url:
         params = sources.get_gslides_params(driver)
     elif 'figma.com/deck' in url:
@@ -143,7 +147,9 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> s
 
     png_slides = scrape_slides(
         driver,
-        params['n_slides'], params['next_btn'], params['slide_selector'],
+        params['n_slides'],
+        params['next_btn'],
+        params['slide_selector'],
         skip_border_removal=skip_border_removal,
         pitch_dot_com=pitch
     )
@@ -155,7 +161,7 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> s
 
     title = ''.join([char for char in driver.title if char.isalpha()])
 
-    output_path = 'decks/' + title + '.pdf'
+    output_path = f"decks/{title}.pdf"
 
     print('\nSaving deck as "' + output_path + '"...')
     images[0].save(
