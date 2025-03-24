@@ -30,4 +30,11 @@ if __name__ == '__main__':
     # Saving the presentation as a PDF
     resolution = ResolutionEnum(args.resolution)
     chrome_driver = get_chrome_driver(resolution, args.disable_headless)
-    download(chrome_driver, args.url, args.skip_border_removal)
+
+    byte_array = download(chrome_driver, args.url, args.skip_border_removal)
+
+    title = ''.join([char for char in chrome_driver.title if char.isalpha()])
+    chrome_driver.close()
+    output_path = f"decks/{title}.pdf"
+    with open(output_path, "wb") as f:
+        f.write(byte_array.getvalue())

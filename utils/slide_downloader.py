@@ -126,7 +126,7 @@ def scrape_slides(
     return png_slides
 
 
-def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> str:
+def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> BytesIO:
     """
     Given a URL, loops over slides to screenshot them and saves a PDF
     """
@@ -157,19 +157,10 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> s
     # Saving the screenshots as a PDF using Pillow
     images = [_rgba_to_rgb(png) for png in png_slides]
 
-    title = ''.join([char for char in driver.title if char.isalpha()])
+    byte_array = BytesIO()
+    images[0].save(byte_array, "PDF", resolution=100.0, save_all=True, append_images=images[1:])
 
-    output_path = f"decks/{title}.pdf"
-
-    print('\nSaving deck as "' + output_path + '"...')
-    images[0].save(
-        output_path, "PDF", resolution=100.0, save_all=True, append_images=images[1:]
-    )
-    print('Deck saved!')
-
-    driver.close()
-
-    return output_path
+    return byte_array
 
 
 def get_pitch_params(driver: Chrome):
@@ -259,5 +250,4 @@ def get_figma_params(driver: Chrome):
         n_slides=int(n_slides),
         next_btn=next_btn,
         slide_selector=(By.TAG_NAME, 'canvas')
-
     )
