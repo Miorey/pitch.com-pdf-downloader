@@ -1,23 +1,27 @@
-from selenium.webdriver.common.by import By
-from selenium.webdriver import Chrome
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-
-from PIL import Image, ImageChops
+import tempfile
+import time
+from enum import Enum
 from io import BytesIO
 
-import time
+from PIL import Image
+from PIL import ImageChops
+from selenium import webdriver
+from selenium.webdriver import Chrome
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
-from enum import Enum
+
+class SlideDownloaderException(Exception):
+    pass
 
 
 # Helper: Loading from memory and converting RGBA to RGB
 def _rgba_to_rgb(png: bytes):
     img = Image.open(BytesIO(png))
     img.load()
-    background = Image.new('RGB', img.size, (255, 255, 255))
+    background = Image.new("RGB", img.size, (255, 255, 255))
 
-    if img.mode == 'RGBA':
+    if img.mode == "RGBA":
         background.paste(img, mask=img.split()[3])
     else:
         background.paste(img)
@@ -44,23 +48,25 @@ class ResolutionEnum(Enum):
     RES_8K = "8K"
 
 
-def get_chrome_driver(resolution: ResolutionEnum, disable_headless: bool = False) -> webdriver.Chrome:
+def get_chrome_driver(
+        resolution: ResolutionEnum, disable_headless: bool = False
+) -> webdriver.Chrome:
     chrome_options = Options()
 
     if not disable_headless:
-        chrome_options.add_argument('--headless')
+        chrome_options.add_argument("--headless")
 
     # Setting resolution
     if resolution == ResolutionEnum.RES_HD:
-        res = 'window-size=1920,1080'
+        res = "window-size=1920,1080"
     elif resolution == ResolutionEnum.RES_4K:
-        res = 'window-size=3840,2160'
+        res = "window-size=3840,2160"
     elif resolution == ResolutionEnum.RES_8K:
-        res = 'window-size=7680,4320'
+        res = "window-size=7680,4320"
     else:
-        raise Exception('Only HD, 4K and 8K resolutions allowed!')
+        raise SlideDownloaderException("Only HD, 4K and 8K resolutions allowed!")
 
-    chrome_options.add_argument('--log-level=3')
+    chrome_options.add_argument("--log-level=3")
     chrome_options.add_argument(res)
 
     # Adding argument to disable the AutomationControlled flag
@@ -72,11 +78,17 @@ def get_chrome_driver(resolution: ResolutionEnum, disable_headless: bool = False
     # Turn-off userAutomationExtension
     chrome_options.add_experimental_option("useAutomationExtension", False)
 
+    # Ensure a unique user data directory
+    user_data_dir = tempfile.mkdtemp()
+    chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
     # Initializing the driver
     driver = webdriver.Chrome(options=chrome_options)
 
     # Changing the property of the navigator value for webdriver to undefined
-    driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+    driver.execute_script(
+        "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+    )
 
     return driver
 
@@ -87,7 +99,7 @@ def scrape_slides(
         next_btn,
         slide_selector,
         pitch_dot_com=False,
-        skip_border_removal=False
+        skip_border_removal=False,
 ) -> list[bytes]:
     """
     Takes a screenshot of all slides and returns a list of pngs
@@ -126,7 +138,9 @@ def scrape_slides(
     return png_slides
 
 
-def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> BytesIO:
+def download(
+        driver: webdriver.Chrome, url: str, skip_border_removal: bool = False
+) -> BytesIO:
     """
     Given a URL, loops over slides to screenshot them and saves a PDF
     """
@@ -135,30 +149,32 @@ def download(driver: webdriver.Chrome, url: str, skip_border_removal: bool) -> B
     time.sleep(10)
 
     pitch = False
-    if 'pitch.com' in url:
+    if "pitch.com" in url:
         params = get_pitch_params(driver)
         pitch = True
-    elif 'docs.google.com/presentation/' in url:
+    elif "docs.google.com/presentation/" in url:
         params = get_gslides_params(driver)
-    elif 'figma.com/deck' in url:
+    elif "figma.com/deck" in url:
         params = get_figma_params(driver)
     else:
-        raise Exception('URL not supported...')
+        raise SlideDownloaderException("URL not supported...")
 
     png_slides = scrape_slides(
         driver,
-        params['n_slides'],
-        params['next_btn'],
-        params['slide_selector'],
+        params["n_slides"],
+        params["next_btn"],
+        params["slide_selector"],
         skip_border_removal=skip_border_removal,
-        pitch_dot_com=pitch
+        pitch_dot_com=pitch,
     )
 
     # Saving the screenshots as a PDF using Pillow
     images = [_rgba_to_rgb(png) for png in png_slides]
 
     byte_array = BytesIO()
-    images[0].save(byte_array, "PDF", resolution=100.0, save_all=True, append_images=images[1:])
+    images[0].save(
+        byte_array, "PDF", resolution=100.0, save_all=True, append_images=images[1:]
+    )
 
     return byte_array
 
@@ -182,20 +198,22 @@ def get_pitch_params(driver: Chrome):
         time.sleep(1)
 
     # Deleting the popup shown at the end of the presentation
-    driver.execute_script("document.getElementsByClassName('player-branding-popover')[0].remove();")
+    driver.execute_script(
+        "document.getElementsByClassName('player-branding-popover')[0].remove();"
+    )
 
-    n_slides = len(driver.find_elements(By.CLASS_NAME, 'dash'))
+    n_slides = len(driver.find_elements(By.CLASS_NAME, "dash"))
 
     # Named differently at times?
-    btns = driver.find_elements(By.CLASS_NAME, 'ng-player-v2--button')
+    btns = driver.find_elements(By.CLASS_NAME, "ng-player-v2--button")
     if len(btns) == 0:
-        btns = driver.find_elements(By.CLASS_NAME, 'player-v2--button')
+        btns = driver.find_elements(By.CLASS_NAME, "player-v2--button")
     next_btn = btns[1]
 
     params = dict(
         n_slides=n_slides,
         next_btn=next_btn,
-        slide_selector=(By.CLASS_NAME, 'slide-wrapper')
+        slide_selector=(By.CLASS_NAME, "slide-wrapper"),
     )
 
     return params
@@ -203,11 +221,13 @@ def get_pitch_params(driver: Chrome):
 
 # Check if we're at the end of the current slide (gradually adding elements)
 def pitch_at_slide_end(driver: Chrome):
-    current_dash = driver.find_element(By.CSS_SELECTOR, '.dash.selected [aria-valuenow]')
+    current_dash = driver.find_element(
+        By.CSS_SELECTOR, ".dash.selected [aria-valuenow]"
+    )
 
-    aria_valuenow = current_dash.get_attribute('aria-valuenow')
+    aria_valuenow = current_dash.get_attribute("aria-valuenow")
 
-    return aria_valuenow == '100'
+    return aria_valuenow == "100"
 
 
 def get_gslides_params(driver: Chrome):
@@ -215,15 +235,15 @@ def get_gslides_params(driver: Chrome):
     Preprocesses Google Slides and returns params to find all slides
     """
 
-    content = driver.find_element(By.CLASS_NAME, 'punch-viewer-container')
+    content = driver.find_element(By.CLASS_NAME, "punch-viewer-container")
 
     n_slides_button = driver.find_elements(By.CSS_SELECTOR, "[aria-setsize]")[0]
-    n_slides = n_slides_button.get_attribute('aria-setsize')
+    n_slides = n_slides_button.get_attribute("aria-setsize")
 
     return dict(
         n_slides=int(n_slides),
         next_btn=content,
-        slide_selector=(By.CLASS_NAME, 'punch-viewer-svgpage-svgcontainer')
+        slide_selector=(By.CLASS_NAME, "punch-viewer-svgpage-svgcontainer"),
     )
 
 
@@ -235,19 +255,24 @@ def get_figma_params(driver: Chrome):
     # Removing the header so it doesn't show up on slides
     header = driver.find_elements(By.CSS_SELECTOR, '[aria-label="Prototype controls"]')
     if header:
-        driver.execute_script("""
+        driver.execute_script(
+            """
             var element = arguments[0];
             element.parentNode.removeChild(element);
-        """, header[0])
+        """,
+            header[0],
+        )
 
     next_btn = driver.find_elements(By.CSS_SELECTOR, '[aria-label="Next frame"]')[0]
 
-    slide_no_text = driver.find_elements(By.CSS_SELECTOR, '[role="status"]')[0].get_attribute('innerText')
+    slide_no_text = driver.find_elements(By.CSS_SELECTOR, '[role="status"]')[
+        0
+    ].get_attribute("innerText")
     print(slide_no_text)
-    n_slides = slide_no_text.split('/')[1].strip()
+    n_slides = slide_no_text.split("/")[1].strip()
 
     return dict(
         n_slides=int(n_slides),
         next_btn=next_btn,
-        slide_selector=(By.TAG_NAME, 'canvas')
+        slide_selector=(By.TAG_NAME, "canvas"),
     )

@@ -1,6 +1,11 @@
 # Download PDF from Pitch.com
 Simple python script to download a presentations as searchable PDF. 
 
+## Linux requirements
+```bash
+sudo apt-get install -y chromium-chromedriver
+```
+
 ## Supported platforms
 - Pitch.com 
 - Google Slides' "Publish to Web" mode
